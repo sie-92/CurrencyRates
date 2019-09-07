@@ -18,16 +18,20 @@ import com.sie.currency.service.model.CurrencyRates;
 import com.sie.currency.service.repository.APIService;
 import com.sie.currency.service.repository.RetrofitClient;
 import com.sie.currency.view.adapter.ListCurrencyAdapter;
+import com.sie.currency.viewmodel.CurrencyViewModel;
 
 import org.json.JSONException;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.util.ArrayList;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.lifecycle.ViewModelProviders;
 import butterknife.BindView;
 import butterknife.ButterKnife;
 import io.reactivex.Observable;
@@ -48,9 +52,8 @@ public class MainActivity extends AppCompatActivity {
 
     Disposable disposable;
     private APIService apiService;
-    private String curBase = "EUR";
     private ListCurrencyAdapter myAdapter;
-    int period = 5000;
+    private CurrencyViewModel mViewModel;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -58,6 +61,8 @@ public class MainActivity extends AppCompatActivity {
         setContentView(R.layout.activity_main);
 
         ButterKnife.bind(this);
+
+        mViewModel = ViewModelProviders.of(this).get(CurrencyViewModel.class);
 
         apiService = RetrofitClient.getClient();
 
@@ -68,7 +73,12 @@ public class MainActivity extends AppCompatActivity {
             @Override
             public void afterTextChanged(Editable s) {
                 if(valueBase.getTag()==null && s.toString().length() != 0 ) {
-                    myAdapter.update(Double.parseDouble(s.toString()));
+                    try {
+                        mViewModel.baseValue = Double.parseDouble(s.toString());
+                        myAdapter.update(mViewModel.baseValue);
+                    } catch (NumberFormatException e) {
+                        e.printStackTrace();
+                    }
                 }
             }
 
@@ -86,6 +96,11 @@ public class MainActivity extends AppCompatActivity {
 
 
     }
+    public void setBaseValue(Double val) {
+        mViewModel.baseValue = val;
+        valueBase.setText(mViewModel.baseValue+"");
+
+    }
 
     @Override
     protected void onResume() {
@@ -97,7 +112,7 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void startDisposable() {
-        disposable = Observable.interval(0, period,
+        disposable = Observable.interval(0, mViewModel.apiCallPeriod,
                 TimeUnit.MILLISECONDS)
                 .observeOn(AndroidSchedulers.mainThread())
                 .subscribe(this::callApi, this::onError);
@@ -106,7 +121,7 @@ public class MainActivity extends AppCompatActivity {
     private void callApi(Long aLong) {
 
 
-        Observable<CurrencyRates> observable = apiService.getCurrencyRates(curBase);
+        Observable<CurrencyRates> observable = apiService.getCurrencyRates(mViewModel.curBase);
         observable.subscribeOn(Schedulers.newThread()).
                 observeOn(AndroidSchedulers.mainThread())
                 .map(result -> result)
@@ -144,7 +159,9 @@ public class MainActivity extends AppCompatActivity {
         ArrayList<Currency> currencies = new ArrayList<Currency>();
         for (String key:ratesKeys) {
             Double rate = ratesObj.get(key).getAsDouble();
-            currencies.add(new Currency(key,rate,Double.parseDouble(valueBase.getText().toString())*rate));
+            BigDecimal bd = new BigDecimal(Double.parseDouble(valueBase.getText().toString())*rate)
+                    .setScale(5, RoundingMode.HALF_UP);
+            currencies.add(new Currency(key,rate,bd.doubleValue()));
         }
 
         if(list.getAdapter()==null) {
@@ -158,10 +175,10 @@ public class MainActivity extends AppCompatActivity {
 
 
         list.setOnItemClickListener((adapterView, view, i, l) -> {
-            curBase = currencies.get(i).code;
+            mViewModel.curBase = currencies.get(i).code;
             disposable.dispose();
             startDisposable();
-            Log.d("bbbb",curBase);
+            Log.d("bbbb",mViewModel.curBase);
         });
 
     }

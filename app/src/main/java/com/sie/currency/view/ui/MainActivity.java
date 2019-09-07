@@ -4,7 +4,6 @@ import android.graphics.drawable.Drawable;
 import android.os.Bundle;
 import android.text.Editable;
 import android.text.TextWatcher;
-import android.util.Log;
 import android.widget.EditText;
 import android.widget.ImageView;
 import android.widget.ListView;
@@ -19,8 +18,6 @@ import com.sie.currency.service.repository.APIService;
 import com.sie.currency.service.repository.RetrofitClient;
 import com.sie.currency.view.adapter.ListCurrencyAdapter;
 import com.sie.currency.viewmodel.CurrencyViewModel;
-
-import org.json.JSONException;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -129,13 +126,13 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void onError(Throwable throwable) {
-        Toast.makeText(this, "OnError in Observable Timer",
+        Toast.makeText(this, "Timer Error",
                 Toast.LENGTH_LONG).show();
-        Log.d("aaaa",throwable.getMessage());
+//        Log.d("aaaa",throwable.getMessage());
     }
 
 
-    private void handleResults(CurrencyRates currency) throws JSONException {
+    private void handleResults(CurrencyRates currency) {
 
         codeBase.setText(currency.getBase());
         //valueBase.setTag("tag");
@@ -150,13 +147,16 @@ public class MainActivity extends AppCompatActivity {
             ims .close();
         }
         catch(IOException ex)
-        {    }
+        {
+            Toast.makeText(this, "Error loading image",
+                    Toast.LENGTH_SHORT).show();
+        }
 
         JsonObject ratesObj = currency.getRates();
         Set<String> ratesKeys = ratesObj.keySet();
         //Log.d("aaaa",ratesObj.get("USD").getAsString());
 
-        ArrayList<Currency> currencies = new ArrayList<Currency>();
+        ArrayList<Currency> currencies = new ArrayList<>();
         for (String key:ratesKeys) {
             Double rate = ratesObj.get(key).getAsDouble();
             BigDecimal bd = new BigDecimal(Double.parseDouble(valueBase.getText().toString())*rate)
@@ -178,18 +178,19 @@ public class MainActivity extends AppCompatActivity {
             mViewModel.curBase = currencies.get(i).code;
             disposable.dispose();
             startDisposable();
-            Log.d("bbbb",mViewModel.curBase);
+//            Log.d("bbbb",mViewModel.curBase);
         });
 
     }
 
     private void handleError(Throwable t) {
+        Toast.makeText(this, "API Error",
+                Toast.LENGTH_LONG).show();
     }
 
     @Override
     protected void onPause() {
         super.onPause();
-
         disposable.dispose();
     }
 }
